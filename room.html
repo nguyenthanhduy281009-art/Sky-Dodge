@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#0f0c29">
+    <title>Phòng Chờ - Sky Dodge</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+    <style>
+        :root { --bg: #0f0c29; --neon: #00d2ff; --purple: #9d50bb; --glass: rgba(255, 255, 255, 0.05); }
+        * { box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
+        body {
+            margin: 0; height: 100vh; display: flex; flex-direction: column;
+            background: radial-gradient(circle at center, #24244e 0%, #0f0c29 100%);
+            color: white; overflow: hidden;
+        }
+        .room-container { display: flex; flex: 1; padding: 15px; gap: 15px; overflow: hidden; }
+        .game-main { flex: 1.5; display: flex; flex-direction: column; gap: 15px; align-items: center; min-width: 0; }
+        .room-title { font-size: 14px; color: #8f95b8; margin: 0; }
+        .bet-bar {
+            width: 100%; background: var(--glass); border-left: 4px solid var(--neon);
+            padding: 10px 15px; border-radius: 12px; display: flex; align-items: center; gap: 10px;
+        }
+        .bet-bar input { background: none; border: none; color: var(--neon); font-size: 16px; font-weight: bold; width: 80px; outline: none; }
+        .bet-bar input:focus { outline: 2px solid var(--neon); border-radius: 4px; }
+
+        .slots-grid { display: grid; grid-template-columns: repeat(3, 70px); grid-template-rows: repeat(2, 70px); gap: 12px; margin: auto; }
+        .slot {
+            width: 70px; height: 70px; background: rgba(0, 0, 0, 0.4); border: 1.5px solid rgba(0, 210, 255, 0.2);
+            border-radius: 12px; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative;
+        }
+        /* Đoạn mới của Duy đây */
+        .slot img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 10px;
+            filter: drop-shadow(0 0 5px rgba(0, 210, 255, 0.5));
+            display: block;
+        }
+
+        .friends-aside { flex: 1; background: var(--glass); border-radius: 20px; backdrop-filter: blur(15px); border: 1px solid rgba(255,255,255,0.1); display: flex; flex-direction: column; min-width: 0; }
+        .aside-header { padding: 15px; text-align: center; color: var(--neon); font-weight: bold; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .friends-list { flex: 1; overflow-y: auto; padding: 10px; }
+        .friend-card { display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.03); margin-bottom: 8px; padding: 10px; border-radius: 12px; }
+        .friend-img { width: 32px; height: 32px; border-radius: 8px; object-fit: cover; }
+        .btn-invite { background: none; border: 1px solid var(--neon); color: var(--neon); padding: 4px 10px; border-radius: 5px; cursor: pointer; font-size: 10px; transition: 0.2s; }
+        .btn-invite:hover { background: var(--neon); color: #000; }
+        .btn-invite:focus-visible { outline: 2px solid white; outline-offset: 2px; }
+
+        .bottom-actions { padding: 15px; display: flex; gap: 10px; }
+        .btn-control { flex: 1; padding: 14px; border: none; border-radius: 12px; font-weight: bold; color: white; cursor: pointer; text-transform: uppercase; transition: 0.2s; }
+        .btn-control:hover { filter: brightness(1.1); }
+        .btn-control:active { transform: scale(0.97); }
+        .btn-exit { background: #ff4757; } .btn-start { background: var(--purple); }
+        .btn-control:focus-visible { outline: 2px solid white; outline-offset: 2px; }
+
+        @media (max-width: 768px) { .room-container { flex-direction: column; overflow-y: auto; } .slots-grid { margin: 20px auto; } }
+    </style>
+</head>
+<body>
+    <div class="room-container">
+        <div class="game-main">
+            <div class="bet-bar"><span>CƯỢC:</span><input type="number" value="1000" min="0" max="1000000" aria-label="Số xu cược"></div>
+            <div class="slots-grid">
+                <div class="slot" id="s0"><i class="fas fa-plus"></i></div>
+                <div class="slot" id="s1"><i class="fas fa-plus"></i></div>
+                <div class="slot" id="s2"><i class="fas fa-plus"></i></div>
+                <div class="slot" id="s3"><i class="fas fa-plus"></i></div>
+                <div class="slot" id="s4"><i class="fas fa-plus"></i></div>
+                <div class="slot" id="s5"><i class="fas fa-plus"></i></div>
+            </div>
+        </div>
+        <div class="friends-aside">
+            <div class="aside-header">BẠN BÈ ONLINE</div>
+            <div class="friends-list" id="friend-list"></div>
+        </div>
+    </div>
+    <div class="bottom-actions">
+        <button class="btn-control btn-exit" onclick="quitRoom()">Thoát</button>
+        <button class="btn-control btn-start">Bắt Đầu</button>
+    </div>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyBbdRgcZmqt5-ywPyssZ1C2CDoj11slDQs",
+  authDomain: "sky-dodge-8f537.firebaseapp.com",
+  databaseURL: "https://sky-dodge-8f537-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "sky-dodge-8f537",
+  storageBucket: "sky-dodge-8f537.firebasestorage.app",
+  messagingSenderId: "169224412363",
+  appId: "1:169224412363:web:de0d018158d8b34e854f4e"
+};
+if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const auth = firebase.auth();
+let hostId = null, isHost = false, user = null, roomRef = null, playerRef = null;
+let playersListener = null, statusListener = null, betListener = null, roomListener = null, friendsListener = null, inviteListener = null;
+let friendStatusRefs = [], presenceCleanup = null, startBusy = false, leavingNormally = false;
+
+function escapeHtml(str) { return String(str == null ? '' : str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+
+function cleanupListeners() {
+  if (playersListener && roomRef) roomRef.child('players').off('value', playersListener);
+  if (statusListener && roomRef) roomRef.child('status').off('value', statusListener);
+  if (betListener && roomRef) roomRef.child('bet').off('value', betListener);
+  if (roomListener && roomRef) roomRef.off('value', roomListener);
+  if (friendsListener && user) db.ref('friends/'+user.uid).off('value', friendsListener);
+  if (inviteListener && user) db.ref('invites/'+user.uid).off('value', inviteListener);
+  friendStatusRefs.forEach(ref => ref.off()); friendStatusRefs = [];
+  if (presenceCleanup) { presenceCleanup(); presenceCleanup = null; }
+  playersListener = statusListener = betListener = roomListener = friendsListener = inviteListener = null;
+}
+
+function setPresence(uid) {
+  const connectedRef = db.ref('.info/connected');
+  const statusRef = db.ref('status/'+uid);
+  const handler = snap => {
+    if (snap.val() !== true) return;
+    statusRef.onDisconnect().set({state:'offline',last_changed:firebase.database.ServerValue.TIMESTAMP})
+      .then(() => statusRef.set({state:'online',last_changed:firebase.database.ServerValue.TIMESTAMP}))
+      .catch(err => console.warn('Presence:', err));
+  };
+  connectedRef.on('value', handler);
+  return () => connectedRef.off('value', handler);
+}
+
+function setPlayer(index, url, ready) {
+  const slot = document.getElementById(`s${index}`); if (!slot) return;
+  slot.innerHTML=''; slot.style.border = ready ? '3px solid #2ecc71' : '1.5px solid rgba(0, 210, 255, 0.2)';
+  if (!url) { const i=document.createElement('i'); i.className='fas fa-plus'; slot.appendChild(i); slot.classList.remove('occupied'); return; }
+  const img=document.createElement('img'); img.src=url; img.referrerPolicy='no-referrer'; img.alt='Người chơi';
+  img.onerror=()=>{img.remove(); const i=document.createElement('i'); i.className='fas fa-user'; slot.appendChild(i);};
+  slot.appendChild(img); slot.classList.add('occupied');
+}
+
+function updateFriendUI(uid, info, online) {
+  const list=document.getElementById('friend-list'); if(!list) return;
+  let row=document.getElementById('f-'+uid); if(!row){row=document.createElement('div');row.id='f-'+uid;row.className='friend-card';list.appendChild(row);}
+  row.innerHTML='';
+  const left=document.createElement('div'); left.style.cssText='display:flex;align-items:center;gap:10px;';
+  const wrap=document.createElement('div'); wrap.style.position='relative';
+  const img=document.createElement('img'); img.className='friend-img'; img.alt='Bạn'; img.referrerPolicy='no-referrer'; img.src=(info&&info.avatarUrl)||''; img.onerror=()=>img.removeAttribute('src'); wrap.appendChild(img);
+  const dot=document.createElement('div'); dot.style.cssText=`width:8px;height:8px;border-radius:50%;background:${online?'#2ecc71':'#666'};position:absolute;bottom:0;right:0;`; wrap.appendChild(dot); left.appendChild(wrap);
+  const name=document.createElement('span'); name.style.cssText='font-size:12px;font-weight:bold;'; name.textContent=(info&&info.name)||'Bạn'; left.appendChild(name); row.appendChild(left);
+  if(online){const b=document.createElement('button');b.className='btn-invite';b.textContent='MỜI';b.onclick=()=>invite(uid);row.appendChild(b);} else {const s=document.createElement('span');s.style.cssText='font-size:10px;opacity:.3';s.textContent='OFF';row.appendChild(s);}
+}
+
+function bindFriends() {
+  const ref=db.ref('friends/'+user.uid);
+  friendsListener=snap=>{
+    friendStatusRefs.forEach(r=>r.off()); friendStatusRefs=[];
+    const list=document.getElementById('friend-list'); list.innerHTML=''; const data=snap.val();
+    if(!data){const d=document.createElement('div');d.style.cssText='text-align:center;font-size:12px;opacity:.5;margin-top:20px;';d.textContent='Trống';list.appendChild(d);return;}
+    Object.entries(data).forEach(([uid,info])=>{const sr=db.ref('status/'+uid);const h=s=>updateFriendUI(uid,info,!!s.val()&&s.val().state==='online');sr.on('value',h);friendStatusRefs.push(sr);});
+  };
+  ref.on('value',friendsListener);
+}
+
+async function ensureRoom() {
+  const roomSnap=await roomRef.once('value'); const status=roomSnap.child('status').val();
+  if(isHost){
+    if(!roomSnap.exists() || ['finished','abandoned','host_disconnected'].includes(status)){
+      await roomRef.update({hostId:user.uid,status:'waiting',bet:Math.max(1,Math.floor(Number(roomSnap.child('bet').val())||1000)),totalPrize:0,winnerData:null,settlement:null,hostDisconnected:false,version:2});
+    } else if(status!=='waiting') throw new Error('Phòng đang ở trong một trận đấu.');
+  } else if(!roomSnap.exists() || status!=='waiting') throw new Error('Phòng không còn nhận người chơi.');
+}
+
+async function joinRoom(){
+  const snap=await playerRef.once('value'); const old=snap.val()||{}; const pSnap=await db.ref('users/'+user.uid).once('value'); const p=pSnap.val()||{};
+  const name=p.name||user.displayName||user.email?.split('@')[0]||'Người chơi'; const avatar=p.avatarUrl||user.photoURL||'';
+  await playerRef.update({name,avatarUrl:avatar,joinedAt:old.joinedAt||firebase.database.ServerValue.TIMESTAMP,isReady:isHost?true:old.isReady===true,state:'waiting',survivalTime:0,stake:0});
+  await playerRef.onDisconnect().update({state:'disconnected',disconnectedAt:firebase.database.ServerValue.TIMESTAMP});
+  if(isHost) await roomRef.onDisconnect().update({hostDisconnected:true,hostDisconnectedAt:firebase.database.ServerValue.TIMESTAMP});
+}
+
+function bindPlayers(){
+  playersListener=snap=>{const ps=snap.val()||{};for(let i=0;i<6;i++)setPlayer(i,null,false);Object.entries(ps).sort((a,b)=>(a[1]?.joinedAt||0)-(b[1]?.joinedAt||0)).slice(0,6).forEach(([_,p],i)=>setPlayer(i,p.avatarUrl,p.isReady===true));};
+  roomRef.child('players').on('value',playersListener);
+}
+
+function bindRoomUI(){
+  const betInput=document.querySelector('.bet-bar input'), startBtn=document.querySelector('.btn-start');
+  if(!isHost){betInput.readOnly=true;betInput.style.opacity='.7';startBtn.textContent='SẴN SÀNG';startBtn.style.background='#3498db';}
+  betListener=s=>{if(s.exists())betInput.value=Math.max(1,Math.floor(Number(s.val())||1));}; roomRef.child('bet').on('value',betListener);
+  betInput.onchange=()=>{if(isHost&&!startBusy){const bet=Math.max(1,Math.min(1000000,Math.floor(Number(betInput.value)||1)));betInput.value=bet;roomRef.child('bet').transaction(()=>bet);}};
+  startBtn.onclick=()=>handleStart(startBtn);
+}
+
+async function handleStart(btn){
+  if(startBusy||!user)return; startBusy=true; btn.disabled=true;
+  try{
+    if(!isHost){const p=await playerRef.once('value');if(!p.exists()||p.child('state').val()!=='waiting')return;const ready=p.child('isReady').val()===true;await playerRef.child('isReady').set(!ready);btn.textContent=ready?'SẴN SÀNG':'HỦY SẴN SÀNG';btn.style.background=ready?'#3498db':'#e67e22';return;}
+    const lock=await roomRef.child('status').transaction(v=>v==='waiting'?'starting':v); if(!lock.committed||lock.snapshot.val()!=='starting')throw new Error('Trận đấu đã được khởi động.');
+    const pSnap=await roomRef.child('players').once('value');const players=pSnap.val()||{};const entries=Object.entries(players);
+    if(entries.length<2)throw new Error('Cần ít nhất 2 người chơi!'); if(!entries.every(([id,p])=>id===hostId||p.isReady===true))throw new Error('Chờ mọi người sẵn sàng!');
+    const bet=Math.floor(Number((await roomRef.child('bet').once('value')).val())||0);if(!Number.isInteger(bet)||bet<1||bet>1000000)throw new Error('Số cược không hợp lệ!');
+    const balances=await Promise.all(entries.map(async([id])=>{const s=await db.ref(`users/${id}/coins`).once('value');return [id,Number(s.val())||0];}));
+    const bad=balances.find(([,c])=>c<bet);if(bad)throw new Error(`${players[bad[0]]?.name||'Một người chơi'} không đủ xu (cần ${bet.toLocaleString('vi-VN')}).`);
+    const matchNo=Number((await roomRef.child('matchNo').once('value')).val()||0)+1; const totalPrize=bet*entries.length; const updates={};
+    updates[`rooms/${hostId}/status`]='playing';updates[`rooms/${hostId}/matchNo`]=matchNo;updates[`rooms/${hostId}/totalPrize`]=totalPrize;updates[`rooms/${hostId}/winnerData`]=null;updates[`rooms/${hostId}/settlement`]=null;updates[`rooms/${hostId}/hostDisconnected`]=false;
+    entries.forEach(([id])=>{updates[`users/${id}/coins`]=firebase.database.ServerValue.increment(-bet);updates[`rooms/${hostId}/players/${id}/state`]='alive';updates[`rooms/${hostId}/players/${id}/survivalTime`]=0;updates[`rooms/${hostId}/players/${id}/stake`]=bet;updates[`rooms/${hostId}/players/${id}/isReady`]=true;});
+    await db.ref().update(updates);
+  }catch(e){await roomRef.child('status').transaction(v=>v==='starting'?'waiting':v);alert(e?.message||'Không thể bắt đầu trận.');}
+  finally{startBusy=false;btn.disabled=false;}
+}
+
+function bindRoomState(){
+  statusListener=async s=>{const status=s.val();if(status==='playing'){leavingNormally=true;try{await playerRef.onDisconnect().cancel();if(isHost)await roomRef.onDisconnect().cancel();}catch(e){}cleanupListeners();location.href='battle.html?id='+encodeURIComponent(hostId);}else if(status==='abandoned'){cleanupListeners();alert('Chủ phòng đã mất kết nối. Phòng đã đóng.');location.href='friends.html';}};
+  roomRef.child('status').on('value',statusListener);
+  roomListener=s=>{if(!s.exists()&&!leavingNormally){cleanupListeners();location.href='friends.html';}};roomRef.on('value',roomListener);
+}
+
+function bindInvites(){
+  const ref=db.ref('invites/'+user.uid);inviteListener=async snap=>{const inv=snap.val();if(!inv||!inv.timestamp)return;const ts=Number(inv.timestamp);if(!Number.isFinite(ts)||Date.now()-ts>60000){await ref.remove().catch(()=>{});return;}const ok=confirm(`Lời mời từ ${String(inv.fromName||'Bạn')}. Tham gia phòng mới?`);await ref.remove().catch(()=>{});if(ok&&inv.roomId&&inv.roomId!==hostId){await playerRef.remove().catch(()=>{});location.href='room.html?id='+encodeURIComponent(inv.roomId);}};ref.on('value',inviteListener);
+}
+
+async function invite(uid){
+  if(!user||!hostId||uid===user.uid)return;const ref=db.ref('invites/'+uid);const snap=await ref.once('value');const old=snap.val();if(old&&Number(old.timestamp)&&Date.now()-Number(old.timestamp)<60000){alert('Người chơi này đã có lời mời đang chờ.');return;}
+  await ref.set({from:user.uid,fromName:user.displayName||'Người chơi',roomId:hostId,timestamp:firebase.database.ServerValue.TIMESTAMP});alert('Đã gửi lời mời!');
+}
+
+async function quitRoom(){
+  if(!user||!roomRef||leavingNormally)return;leavingNormally=true;
+  try{await playerRef.onDisconnect().cancel();if(isHost){await roomRef.onDisconnect().cancel();await roomRef.remove();}else await playerRef.remove();}catch(e){console.warn(e);}finally{cleanupListeners();location.href='friends.html';}
+}
+
+auth.onAuthStateChanged(async currUser=>{
+  cleanupListeners(); if(!currUser){location.href='auth.html';return;} user=currUser;const url=new URL(location.href);hostId=url.searchParams.get('id')||user.uid;isHost=hostId===user.uid;if(!url.searchParams.get('id')){url.searchParams.set('id',user.uid);history.replaceState({},'',url.toString());}
+  try{presenceCleanup=setPresence(user.uid);roomRef=db.ref('rooms/'+hostId);playerRef=roomRef.child('players/'+user.uid);await ensureRoom();await joinRoom();bindRoomUI();bindPlayers();bindRoomState();bindFriends();bindInvites();}catch(e){console.error(e);alert(e?.message||'Không thể vào phòng.');location.href='friends.html';}
+});
+
+</script>
+</body>
+</html>

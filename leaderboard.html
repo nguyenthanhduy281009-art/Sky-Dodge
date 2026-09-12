@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#8BC34A">
+    <title>SKY DODGE - Bảng Xếp Hạng</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #1a1a1a; color: white; margin: 0; padding: 20px; text-align: center; height: 100vh; height: 100dvh; box-sizing: border-box; display: flex; align-items: center; justify-content: center; }
+        .container { width: 100%; max-width: 500px; margin: auto; background: #2c3e50; padding: 20px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border: 2px solid #8BC34A; box-sizing: border-box; }
+        h1 { color: #8BC34A; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 10px 0; font-size: 24px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; table-layout: fixed; }
+        th { border-bottom: 2px solid #8BC34A; padding: 10px; color: #8BC34A; font-size: 14px; }
+        td { padding: 12px 8px; border-bottom: 1px solid #3e4f5f; font-size: 14px; word-break: break-word; }
+        td.name-cell { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .rank-1 { color: #FFD700; font-weight: bold; font-size: 22px; }
+        .rank-2 { color: #C0C0C0; font-weight: bold; }
+        .rank-3 { color: #CD7F32; font-weight: bold; }
+        .back-btn { margin-top: 25px; padding: 12px 30px; background: #8BC34A; color: white; border: none; border-radius: 50px; cursor: pointer; font-weight: bold; width: 100%; transition: 0.2s; font-size: 16px; }
+        .back-btn:hover { filter: brightness(1.1); }
+        .back-btn:active { transform: scale(0.97); }
+        .back-btn:focus-visible { outline: 3px solid white; outline-offset: 2px; }
+        @media (max-width: 400px) {
+            body { padding: 10px; }
+            .container { padding: 14px; border-radius: 14px; }
+            h1 { font-size: 20px; }
+            td { padding: 10px 6px; font-size: 13px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>TOP 10 CHIẾN BINH</h1>
+    <table>
+        <thead>
+            <tr>
+                <th style="width:20%">Hạng</th>
+                <th style="width:55%">Tên</th>
+                <th style="width:25%">Kỷ lục (s)</th>
+            </tr>
+        </thead>
+        <tbody id="leaderboard-body">
+            <tr><td colspan="3">Đang tải dữ liệu...</td></tr>
+        </tbody>
+    </table>
+    <button class="back-btn" onclick="location.href='index.html'">QUAY LẠI</button>
+</div>
+
+<script>
+const firebaseConfig={apiKey:"AIzaSyBbdRgcZmqt5-ywPyssZ1C2CDoj11slDQs",authDomain:"sky-dodge-8f537.firebaseapp.com",databaseURL:"https://sky-dodge-8f537-default-rtdb.asia-southeast1.firebasedatabase.app",projectId:"sky-dodge-8f537",storageBucket:"sky-dodge-8f537.firebasestorage.app",messagingSenderId:"169224412363",appId:"1:169224412363:web:de0d018158d8b34e854f4e"};
+if(!firebase.apps.length)firebase.initializeApp(firebaseConfig);const db=firebase.database(),auth=firebase.auth();let leaderboardListener=null,presenceCleanup=null;
+function escapeHtml(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+function setPresence(uid){const c=db.ref('.info/connected'),s=db.ref('status/'+uid);const h=x=>{if(x.val()!==true)return;s.onDisconnect().set({state:'offline',last_changed:firebase.database.ServerValue.TIMESTAMP}).then(()=>s.set({state:'online',last_changed:firebase.database.ServerValue.TIMESTAMP}));};c.on('value',h);return()=>c.off('value',h);}
+function renderError(text){const b=document.getElementById('leaderboard-body');b.innerHTML='';const tr=document.createElement('tr'),td=document.createElement('td');td.colSpan=3;td.textContent=text;tr.appendChild(td);b.appendChild(tr);}
+function loadLeaderboard(){const ref=db.ref('leaderboard').orderByChild('score').limitToLast(10);leaderboardListener=snap=>{const list=[];snap.forEach(ch=>{const d=ch.val()||{};list.push({uid:ch.key,name:d.name||'Ẩn danh',score:Number(d.score)||0});});list.sort((a,b)=>b.score-a.score||a.uid.localeCompare(b.uid));const body=document.getElementById('leaderboard-body');body.innerHTML='';if(!list.length){const tr=document.createElement('tr'),td=document.createElement('td');td.colSpan=3;td.textContent='Chưa có dữ liệu';tr.appendChild(td);body.appendChild(tr);return;}list.forEach((u,i)=>{const tr=document.createElement('tr');if(i<3)tr.className='rank-'+(i+1);const td1=document.createElement('td');td1.textContent=i===0?'🥇':i===1?'🥈':i===2?'🥉':String(i+1);const td2=document.createElement('td');td2.className='name-cell';td2.textContent=u.name;const td3=document.createElement('td');td3.textContent=String(u.score);tr.append(td1,td2,td3);body.appendChild(tr);});};ref.on('value',leaderboardListener,err=>renderError(err?.code==='PERMISSION_DENIED'?'Không có quyền đọc bảng xếp hạng.':'Không thể tải bảng xếp hạng.'));}
+auth.onAuthStateChanged(user=>{if(!user){location.href='auth.html';return;}if(presenceCleanup)presenceCleanup();presenceCleanup=setPresence(user.uid);if(!leaderboardListener)loadLeaderboard();});
+
+</script>
+</body>
+</html>

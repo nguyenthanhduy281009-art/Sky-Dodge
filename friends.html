@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#5d5dff">
+    <title>Bạn Bè - SKY DODGE</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .status-dot.offline { color: #757575; } /* Màu xám cho offline */
+        .status-dot.online { color: var(--success); } /* Màu xanh cho online */
+        :root { --primary: #5d5dff; --bg: #1a1a2e; --card: #2a2a4a; --success: #4CAF50; --danger: #ff4d4d; }
+        body { font-family: 'Inter', sans-serif; background: var(--bg); color: white; margin: 0; padding: 20px; display: flex; flex-direction: column; height: 100vh; height: 100dvh; box-sizing: border-box; overflow: hidden; }
+
+        .header-title { text-align: center; font-size: 24px; font-weight: 800; color: white; margin-bottom: 25px; letter-spacing: 2px; }
+
+        /* SEARCH BOX */
+        .search-container { display: flex; gap: 10px; background: var(--card); border-radius: 50px; padding: 5px 5px 5px 20px; align-items: center; margin-bottom: 20px; }
+        .search-container input { flex: 1; background: transparent; border: none; color: white; outline: none; font-size: 16px; min-width: 0; }
+        .btn-search { background: var(--primary); border: none; padding: 10px 25px; border-radius: 50px; color: white; font-weight: bold; cursor: pointer; transition: 0.2s; white-space: nowrap; }
+        .btn-search:hover { filter: brightness(1.1); }
+        .btn-search:focus-visible, .action-button:focus-visible, .btn-sm:focus-visible, .btn-back:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+
+        /* ACTION BUTTONS */
+        .main-actions { display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; }
+        .action-button { background: var(--card); padding: 18px 20px; border-radius: 15px; font-size: 18px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 15px; position: relative; transition: 0.2s; }
+        .action-button:hover { filter: brightness(1.15); }
+        .action-button i { color: var(--primary); width: 25px; text-align: center; }
+        .badge { background: var(--danger); color: white; font-size: 12px; padding: 2px 8px; border-radius: 10px; position: absolute; right: 20px; }
+
+        /* LISTS */
+        .list-box { flex: 1; overflow-y: auto; background: var(--card); border-radius: 20px; padding: 10px 15px; margin-bottom: 15px; min-height: 0; }
+        .list-label { text-align: center; font-size: 14px; color: #888; margin-bottom: 10px; font-weight: bold; }
+        .friend-item { display: flex; align-items: center; justify-content: space-between; padding: 15px 0; border-bottom: 1px solid #3a3a60; }
+        .friend-item:last-child { border-bottom: none; }
+        .info { display: flex; align-items: center; gap: 12px; min-width: 0; }
+        .avatar { width: 40px; height: 40px; background: var(--primary); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0; }
+        .friend-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+        .status-dot { color: var(--success); font-size: 12px; display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+        .btn-sm { border: none; padding: 8px 12px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 12px; color: white; transition: 0.2s; }
+        .btn-sm:hover { filter: brightness(1.1); }
+
+        .btn-back { background: #333; padding: 18px; border-radius: 50px; text-align: center; font-weight: bold; cursor: pointer; text-decoration: none; color: white; margin-top: auto; transition: 0.2s; }
+        .btn-back:hover { filter: brightness(1.3); }
+
+        #search-result { background: #3a3a60; border-radius: 15px; padding: 10px; margin-bottom: 15px; display: none; }
+
+        @media (max-width: 480px) {
+            body { padding: 14px; }
+            .header-title { font-size: 20px; margin-bottom: 16px; }
+            .search-container { padding: 4px 4px 4px 16px; }
+            .search-container input { font-size: 14px; }
+            .btn-search { padding: 9px 18px; font-size: 14px; }
+            .action-button { padding: 15px; font-size: 16px; }
+            .friend-item { padding: 12px 0; }
+            .avatar { width: 36px; height: 36px; font-size: 14px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header-title">BẠN BÈ</div>
+
+    <div class="search-container">
+        <i class="fas fa-search" style="color:#888"></i>
+        <input type="text" id="search-input" placeholder="Ô tìm kiếm bạn bè" maxlength="30" autocomplete="off">
+        <button class="btn-search" onclick="searchUser()">TÌM</button>
+    </div>
+
+    <div id="search-result"></div>
+
+    <div class="main-actions">
+    <div class="action-button" onclick="location.href='room.html'" role="button" tabindex="0">
+        <i class="fas fa-plus"></i> Tạo phòng chơi cược
+    </div>
+
+    <div class="action-button" onclick="toggleRequests()" role="button" tabindex="0">
+        <i class="fas fa-user-clock"></i> Lời mời kết bạn
+        <span id="request-count" class="badge" style="display:none">0</span>
+    </div>
+</div>
+
+    <div id="request-box" class="list-box" style="display:none; border: 1px solid var(--primary); height: 200px;">
+        <div class="list-label">LỜI MỜI ĐANG CHỜ</div>
+        <div id="request-list-content"></div>
+    </div>
+
+    <div class="list-box">
+        <div class="list-label">DANH SÁCH BẠN BÈ</div>
+        <div id="friend-list-content"></div>
+    </div>
+
+    <div class="btn-back" onclick="location.href='index.html'" role="button" tabindex="0">QUAY LẠI TRANG CHỦ</div>
+
+<script>
+const firebaseConfig={apiKey:"AIzaSyBbdRgcZmqt5-ywPyssZ1C2CDoj11slDQs",authDomain:"sky-dodge-8f537.firebaseapp.com",databaseURL:"https://sky-dodge-8f537-default-rtdb.asia-southeast1.firebasedatabase.app",projectId:"sky-dodge-8f537",storageBucket:"sky-dodge-8f537.firebasestorage.app",messagingSenderId:"169224412363",appId:"1:169224412363:web:de0d018158d8b34e854f4e"};
+if(!firebase.apps.length)firebase.initializeApp(firebaseConfig);const db=firebase.database(),auth=firebase.auth();let myId='',myName='',presenceCleanup=null,friendsListener=null,requestsListener=null;let statusRefs=new Map(),statusTimers=new Map();
+function escapeHtml(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+function setPresence(uid){const c=db.ref('.info/connected'),s=db.ref('status/'+uid);const h=snap=>{if(snap.val()!==true)return;s.onDisconnect().set({state:'offline',last_changed:firebase.database.ServerValue.TIMESTAMP}).then(()=>s.set({state:'online',last_changed:firebase.database.ServerValue.TIMESTAMP}));};c.on('value',h);return()=>c.off('value',h);}
+function clearStatus(uid){const r=statusRefs.get(uid);if(r)r.off();statusRefs.delete(uid);const t=statusTimers.get(uid);if(t)clearTimeout(t);statusTimers.delete(uid);}
+function clearAllStatuses(){[...statusRefs.keys()].forEach(clearStatus);}
+function renderRequestCount(n){const el=document.getElementById('request-count');el.innerText=n;el.style.display=n?'block':'none';}
+async function searchUser(){const name=document.getElementById('search-input').value.trim();const box=document.getElementById('search-result');box.style.display='block';box.innerHTML='';if(!name)return;try{const friends=await db.ref('friends/'+myId).once('value');const ids=new Set(friends.exists()?Object.keys(friends.val()):[]);const snap=await db.ref('users').orderByChild('name').equalTo(name).limitToFirst(10).once('value');let found=false;snap.forEach(child=>{if(child.key===myId||ids.has(child.key))return;found=true;const row=document.createElement('div');row.className='friend-item';row.style.border='none';const info=document.createElement('div');info.className='info';const a=document.createElement('div');a.className='avatar';a.textContent=(child.val()?.name||'U').charAt(0).toUpperCase();const b=document.createElement('b');b.className='friend-name';b.textContent=child.val()?.name||'Người chơi';info.append(a,b);const btn=document.createElement('button');btn.className='btn-sm';btn.style.background='var(--primary)';btn.textContent='Kết bạn';btn.onclick=()=>sendRequest(child.key);row.append(info,btn);box.appendChild(row);});if(!found)box.innerHTML='<p style="text-align:center">Không tìm thấy!</p>';}catch(e){box.innerHTML='<p style="text-align:center">Không thể tìm kiếm lúc này.</p>';}}
+async function sendRequest(fId){if(!myId||!fId||fId===myId)return;const [friendSnap,outSnap,inSnap]=await Promise.all([db.ref('friends/'+myId+'/'+fId).once('value'),db.ref('friendRequests/'+fId+'/'+myId).once('value'),db.ref('friendRequests/'+myId+'/'+fId).once('value')]);if(friendSnap.exists())return alert('Hai người đã là bạn.');if(outSnap.exists()||inSnap.exists())return alert('Lời mời đang tồn tại.');const ref=db.ref('friendRequests/'+fId+'/'+myId);const r=await ref.transaction(v=>v||{from:myName,createdAt:firebase.database.ServerValue.TIMESTAMP});if(r.committed)alert('Đã gửi lời mời!');else alert('Lời mời đã tồn tại.');document.getElementById('search-result').style.display='none';document.getElementById('search-input').value='';}
+function loadRequests(){const ref=db.ref('friendRequests/'+myId);requestsListener=snap=>{const list=document.getElementById('request-list-content');list.innerHTML='';let count=0;snap.forEach(ch=>{count++;const row=document.createElement('div');row.className='friend-item';const name=document.createElement('b');name.textContent=ch.val()?.from||'Người chơi';const wrap=document.createElement('div');wrap.style.cssText='display:flex;gap:5px';const a=document.createElement('button');a.className='btn-sm';a.style.background='var(--success)';a.textContent='Đồng ý';a.onclick=()=>accept(ch.key);const r=document.createElement('button');r.className='btn-sm';r.style.background='var(--danger)';r.textContent='Xóa';r.onclick=()=>reject(ch.key);wrap.append(a,r);row.append(name,wrap);list.appendChild(row);});renderRequestCount(count);};ref.on('value',requestsListener);}
+async function accept(fId){if(!myId||!fId||fId===myId)return;const req=await db.ref('friendRequests/'+myId+'/'+fId).once('value');if(!req.exists())return;const myProfile=await db.ref('users/'+myId).once('value');const their=await db.ref('users/'+fId).once('value');const myData=myProfile.val()||{},theirData=their.val()||{};const updates={};updates[`friends/${myId}/${fId}`]={name:theirData.name||req.val()?.from||'Người chơi'};updates[`friends/${fId}/${myId}`]={name:myData.name||myName||'Người chơi'};updates[`friendRequests/${myId}/${fId}`]=null;await db.ref().update(updates);}
+async function reject(fId){if(fId)await db.ref('friendRequests/'+myId+'/'+fId).remove();}
+function renderFriend(friendId,info,online){const list=document.getElementById('friend-list-content');let row=document.getElementById('friend-'+friendId);if(!row){row=document.createElement('div');row.id='friend-'+friendId;row.className='friend-item';list.appendChild(row);}row.innerHTML='';const inf=document.createElement('div');inf.className='info';const a=document.createElement('div');a.className='avatar';a.textContent=(info?.name||'U').charAt(0).toUpperCase();const b=document.createElement('b');b.className='friend-name';b.textContent=info?.name||'Người chơi';inf.append(a,b);const s=document.createElement('div');s.className='status-dot '+(online?'online':'offline');s.textContent=online?'● Online':'● Offline';row.append(inf,s);}
+function loadFriends(){const ref=db.ref('friends/'+myId);friendsListener=snap=>{clearAllStatuses();const list=document.getElementById('friend-list-content');list.innerHTML='';if(!snap.exists()){list.innerHTML='<p style="text-align:center;color:#666">Chưa có bạn bè</p>';return;}snap.forEach(ch=>{const id=ch.key,info=ch.val()||{};const sr=db.ref('status/'+id);const h=s=>{const d=s.val()||{},online=d.state==='online';renderFriend(id,info,online);if(!online&&d.last_changed){const delay=Math.max(0,30000-(Date.now()-Number(d.last_changed)));const old=statusTimers.get(id);if(old)clearTimeout(old);statusTimers.set(id,setTimeout(()=>sr.once('value').then(x=>{const z=x.val()||{};renderFriend(id,info,z.state==='online');}),delay));}};sr.on('value',h);statusRefs.set(id,sr);});};ref.on('value',friendsListener);}
+function toggleRequests(){const b=document.getElementById('request-box');b.style.display=b.style.display==='none'?'block':'none';}
+auth.onAuthStateChanged(async user=>{if(!user){location.href='auth.html';return;}myId=user.uid;myName=user.displayName||user.email?.split('@')[0]||'Người chơi';if(presenceCleanup)presenceCleanup();presenceCleanup=setPresence(myId);const me=await db.ref('users/'+myId+'/name').once('value');myName=me.val()||myName;loadRequests();loadFriends();});
+document.getElementById('search-input').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();searchUser();}});
+
+</script>
+</body>
+</html>
